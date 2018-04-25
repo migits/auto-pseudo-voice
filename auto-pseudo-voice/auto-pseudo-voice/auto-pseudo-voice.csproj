@@ -66,6 +66,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="WindowFunction.cs" />
     <Compile Include="STFT.cs" />
     <Compile Include="Maximal.cs" />
     <Compile Include="Form1.cs">

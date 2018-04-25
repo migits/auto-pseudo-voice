@@ -23,42 +23,52 @@ namespace auto_pseudo_voice
 
             Title title1 = new Title("波形");
 
-            chart1.ChartAreas["ChartArea1"].AxisX.Title = "時間[秒]";
+            chart1.ChartAreas["ChartArea1"].AxisX.Title = "時間 [秒]";
             chart1.ChartAreas["ChartArea1"].AxisY.Title = "振幅";
+            chart1.ChartAreas["ChartArea1"].BackColor = Color.Black;
 
             float[] sintbl = Array.ConvertAll(
                 Enumerable.Range(0, 256).ToArray(),
-                i => Convert.ToSingle(Math.Sin(2.0*Math.PI*16*i/256.0))
+                i => Convert.ToSingle(Math.Sin(2.0*Math.PI*16*i/256.0)
+                    + Math.Sin(2.0*Math.PI*100.0*i/256.0))
             );
 
             Series test = new Series();
             test.ChartType = SeriesChartType.Line;
+            test.Color = Color.Lime;
+            test.BorderWidth = 2;
             for(int i = 0; i < sintbl.Length; i++)
             {
                 test.Points.AddXY(i, sintbl[i]);
             }
-            test.Name = "16Hz正弦波";
-            
-            Legend leg = new Legend();
-            leg.DockedToChartArea = "ChartArea1";
-            leg.Alignment = StringAlignment.Near;
 
             chart1.Series.Add(test);
-            chart1.Legends.Add(leg);
             chart1.Titles.Add(title1);
 
 
+            chart2.Series.Clear();
+            chart2.Legends.Clear();
+            chart2.Titles.Clear();
+
+            var title2 = new Title("スペクトル");
+
+            chart2.ChartAreas["ChartArea1"].AxisX.Title = "周波数 [Hz]";
+            chart2.ChartAreas["ChartArea1"].AxisY.Title = "パワー";
+            chart2.ChartAreas["ChartArea1"].BackColor = Color.Black;
+
             Series spectrum = new Series();
             spectrum.ChartType = SeriesChartType.Column;
+            spectrum.Color = Color.Lime;
+            spectrum["PointWidth"] = "1.0";
+            spectrum.BorderColor = Color.Green;
 
-            var it = (new STFTIterator(sintbl, hamming(256))).GetEnumerator();
+            var it = (new STFTIterator(sintbl, WindowFunction.hamming(256))).GetEnumerator();
             it.MoveNext();
             float[] power = Array.ConvertAll(it.Current, x => Convert.ToSingle(x.Norm()));
             for (int k = 0; k < power.Length; k++) {
                 spectrum.Points.AddXY(k, power[k]);
             }
-            spectrum.Name = "スペクトラム";
-
+            spectrum.Name = "スペクトル";
 
             Series maximul = new Series();
             maximul.ChartType = SeriesChartType.Point;
@@ -67,23 +77,26 @@ namespace auto_pseudo_voice
             {
                 if (power[i] > 0.1) maximul.Points.AddXY(i, power[i]);
             }
-            maximul.Name = "スペクトラムのピーク";
-            maximul.MarkerSize = 8;
-            maximul.MarkerStyle = MarkerStyle.Circle;
+            maximul.Name = "スペクトルのピーク";
+            maximul.MarkerSize = 12;
+            maximul.MarkerStyle = MarkerStyle.Cross;
+            maximul.Color = Color.Yellow;
 
+            var leg = new Legend();
+            leg.DockedToChartArea = "ChartArea1";
+            leg.Alignment = StringAlignment.Near;
+            leg.BackColor = Color.FromArgb(0xA0, 0xA0, 0xA0);
+            leg.ForeColor = Color.Cyan;
+            leg.BorderColor = Color.Gray;
 
             chart2.Series.Clear();
             chart2.Series.Add(spectrum);
             chart2.Series.Add(maximul);
+            chart2.Legends.Add(leg);
+            chart2.Titles.Add(title2);
         }
 
-        private static float[] hamming(int width)
-        {
-            return Array.ConvertAll(
-                Enumerable.Range(0, width).ToArray(),
-                n => Convert.ToSingle(0.54 - 0.46*Math.Cos(2.0*Math.PI*n/width))
-            );
-        }
+        
 
         private void Form1_Load(object sender, EventArgs e)
         {
