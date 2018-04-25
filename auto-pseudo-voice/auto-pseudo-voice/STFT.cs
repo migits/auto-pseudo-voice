@@ -9,25 +9,41 @@ namespace auto_pseudo_voice
 {
     class STFTIterator
     {
-        private readonly double[] x, w;
-        private readonly int N,M,step;
-        public STFTIterator(double[] x, double[] w, int step)
+        private readonly float[] x, w;
+        private readonly int N, nPerSeg, step;
+        public STFTIterator(float[] x, float[] window)
         {
-            this.w = w;
+            this.x = x;
+            this.w = window;
             this.N = x.Length;
-            this.M = w.Length;
-            this.step = step;
+            this.nPerSeg = w.Length;
+            this.step = this.nPerSeg/2;
 
-            this.x = new double[((N-1)/M + 1)*M];
+            if (this.nPerSeg % 2 != 0) {
+                throw new ArgumentException();
+            }
+            if ((N-this.nPerSeg) % this.step != 0) {
+                throw new ArgumentException();
+            }
         }
 
-        public IEnumerator<double[]> GetEnumerator()
+        public IEnumerator<Complex32[]> GetEnumerator()
         {
-            var piece = new double[M];
-            for (int n = 0; n < N; n += step)
+            int resultLen = this.nPerSeg/2 + 1;
+            var buffer = new float[2*resultLen];
+            for (int n = 0; n <= N-this.nPerSeg; n += this.step)
             {
-                Array.Copy(this.x, n, piece, 
-                yield ForwardReal();
+                for (int i = 0; i < this.nPerSeg; i++) {
+                    float a = (float)i/this.nPerSeg;
+                    buffer[i] = 2*(i<this.step ? a : 1-a) * this.x[n+i];
+                }
+                Fourier.ForwardReal(buffer, this.nPerSeg);
+
+                var result = new Complex32[resultLen];
+                for (int i = 0; i < resultLen; i++) {
+                    result[i] = new Complex32(buffer[2*i], buffer[2*i+1]);
+                }
+                yield return result;
             }
         }
     }
