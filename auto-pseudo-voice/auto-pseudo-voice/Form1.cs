@@ -90,9 +90,16 @@ namespace auto_pseudo_voice
 
         }
 
-        private void chart1_Click(object sender, EventArgs e)
+        private void wavファイルを開くToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            var ofd = new OpenFileDialog();
+            ofd.Filter = "wavファイル(*.wav)|*.wav|すべてのファイル(*.*)|*.*";
+            ofd.Title = "wavファイルを開く";
 
+            if (ofd.ShowDialog() == DialogResult.OK)
+            {
+                Console.WriteLine(ofd.FileName);
+            }
         }
     }
 }
