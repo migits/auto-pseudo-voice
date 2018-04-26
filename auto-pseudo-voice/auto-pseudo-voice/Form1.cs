@@ -8,11 +8,17 @@ using System.Text;
 using System.Windows.Forms;
 using System.Windows.Forms.DataVisualization.Charting;
 using MathNet.Numerics;
+using NAudio.Wave;
+using System.Threading.Tasks;
+using System.Threading;
 
 namespace auto_pseudo_voice
 {
     public partial class Form1 : Form
     {
+        List<AudioFileReader> readers = new List<AudioFileReader>();
+        WaveOut wo = new WaveOut();
+
         public Form1()
         {
             InitializeComponent();
@@ -26,20 +32,28 @@ namespace auto_pseudo_voice
             chart1.ChartAreas["ChartArea1"].AxisX.Title = "時間 [秒]";
             chart1.ChartAreas["ChartArea1"].AxisY.Title = "振幅";
             chart1.ChartAreas["ChartArea1"].BackColor = Color.Black;
+            chart1.ChartAreas["ChartArea1"].AxisX.MajorGrid.LineColor =
+                chart1.ChartAreas["ChartArea1"].AxisY.MajorGrid.LineColor =
+                    Color.DarkGreen;
+
+            var rand = new Random();
+
+            int N = 1024;
 
             float[] sintbl = Array.ConvertAll(
-                Enumerable.Range(0, 256).ToArray(),
-                i => Convert.ToSingle(Math.Sin(2.0*Math.PI*16*i/256.0)
-                    + Math.Sin(2.0*Math.PI*100.0*i/256.0))
+                Enumerable.Range(0, N).ToArray(),
+                i => Convert.ToSingle(Math.Sin(2.0*Math.PI*16*i/N)
+                    + Math.Sin(2.0*Math.PI*100*i/N))
             );
 
             Series test = new Series();
             test.ChartType = SeriesChartType.Line;
             test.Color = Color.Lime;
             test.BorderWidth = 2;
-            for(int i = 0; i < sintbl.Length; i++)
+            var usSin = Resampler.resample(sintbl, sintbl.Length*16);
+            for(int i = 0; i < usSin.Length; i++)
             {
-                test.Points.AddXY(i, sintbl[i]);
+                test.Points.AddXY(i, usSin[i]);
             }
 
             chart1.Series.Add(test);
@@ -55,6 +69,9 @@ namespace auto_pseudo_voice
             chart2.ChartAreas["ChartArea1"].AxisX.Title = "周波数 [Hz]";
             chart2.ChartAreas["ChartArea1"].AxisY.Title = "パワー";
             chart2.ChartAreas["ChartArea1"].BackColor = Color.Black;
+            chart2.ChartAreas["ChartArea1"].AxisX.MajorGrid.LineColor =
+                chart2.ChartAreas["ChartArea1"].AxisY.MajorGrid.LineColor =
+                    Color.DarkGreen;
 
             Series spectrum = new Series();
             spectrum.ChartType = SeriesChartType.Column;
@@ -62,7 +79,7 @@ namespace auto_pseudo_voice
             spectrum["PointWidth"] = "1.0";
             spectrum.BorderColor = Color.Green;
 
-            var it = (new STFTIterator(sintbl, WindowFunction.hamming(256))).GetEnumerator();
+            var it = (new STFTIterator(sintbl, WindowFunction.hamming(N), N/2)).GetEnumerator();
             it.MoveNext();
             float[] power = Array.ConvertAll(it.Current, x => Convert.ToSingle(x.Norm()));
             for (int k = 0; k < power.Length; k++) {
@@ -75,7 +92,7 @@ namespace auto_pseudo_voice
             var args = Maximal.argrelmax(power);
             foreach(int i in args)
             {
-                if (power[i] > 0.1) maximul.Points.AddXY(i, power[i]);
+                maximul.Points.AddXY(i, power[i]);
             }
             maximul.Name = "スペクトルのピーク";
             maximul.MarkerSize = 12;
@@ -103,15 +120,39 @@ namespace auto_pseudo_voice
 
         }
 
-        private void wavファイルを開くToolStripMenuItem_Click(object sender, EventArgs e)
+        private void refAddFileButton_Click(object sender, EventArgs e)
         {
             var ofd = new OpenFileDialog();
             ofd.Filter = "wavファイル(*.wav)|*.wav|すべてのファイル(*.*)|*.*";
             ofd.Title = "wavファイルを開く";
+            ofd.Multiselect = true;
 
             if (ofd.ShowDialog() == DialogResult.OK)
             {
-                Console.WriteLine(ofd.FileName);
+                foreach (string name in ofd.FileNames) {
+                    readers.Add(new AudioFileReader(name));
+                    soundFileList.Items.Add(name);
+                }
+            }
+        }
+
+        private void soundFileList_MouseClick(object sender, MouseEventArgs e)
+        {
+            PlaySelectedSound();
+        }
+
+        private async Task PlaySelectedSound()
+        {
+            if (wo.PlaybackState == PlaybackState.Playing) {
+                wo.Dispose();
+                wo = new WaveOut();
+            }
+            
+            wo.Init(new AudioFileReader(soundFileList.Text));
+            wo.Play();
+
+            while (wo.PlaybackState == PlaybackState.Playing) {
+                await TaskEx.Delay(1);
             }
         }
     }

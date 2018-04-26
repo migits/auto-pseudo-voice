@@ -11,17 +11,16 @@ namespace auto_pseudo_voice
     {
         private readonly float[] x, w;
         private readonly int N, nPerSeg, step;
-        public STFTIterator(float[] x, float[] window)
+        private readonly float wNorm;
+        public STFTIterator(float[] x, float[] window, int step)
         {
             this.x = x;
             this.w = window;
             this.N = x.Length;
             this.nPerSeg = w.Length;
-            this.step = this.nPerSeg/2;
-
-            if (this.nPerSeg % 2 != 0) {
-                throw new ArgumentException();
-            }
+            this.step = step;
+            this.wNorm = w.Sum()/this.nPerSeg;
+            
             if ((N-this.nPerSeg) % this.step != 0) {
                 throw new ArgumentException();
             }
@@ -31,17 +30,17 @@ namespace auto_pseudo_voice
         {
             int resultLen = this.nPerSeg/2 + 1;
             var buffer = new float[2*resultLen];
-            for (int n = 0; n <= N-this.nPerSeg; n += this.step)
+            for (int offset = 0; offset < N; offset += this.step)
             {
-                for (int i = 0; i < this.nPerSeg; i++) {
-                    float a = (float)i/this.nPerSeg;
-                    buffer[i] = 2*(i<this.step ? a : 1-a) * this.x[n+i];
+                for (int n = 0; n < this.nPerSeg; n++) {
+                    buffer[n] = this.w[n] * this.x[offset+n];
                 }
-                Fourier.ForwardReal(buffer, this.nPerSeg);
+                Fourier.ForwardReal(buffer, this.nPerSeg, FourierOptions.NoScaling);
 
                 var result = new Complex32[resultLen];
-                for (int i = 0; i < resultLen; i++) {
-                    result[i] = new Complex32(buffer[2*i], buffer[2*i+1]);
+                for (int k = 0; k < resultLen; k++) {
+                    result[k] = (new Complex32(buffer[2*k], buffer[2*k+1]))*2/this.nPerSeg
+                        / this.wNorm;
                 }
                 yield return result;
             }
