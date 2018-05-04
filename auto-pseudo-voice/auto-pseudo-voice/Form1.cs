@@ -11,148 +11,46 @@ using MathNet.Numerics;
 using NAudio.Wave;
 using System.Threading.Tasks;
 using System.Threading;
+using System.IO;
 
 namespace auto_pseudo_voice
 {
     public partial class Form1 : Form
     {
-        List<AudioFileReader> readers = new List<AudioFileReader>();
+        Dictionary<string, AudioFileReader> readers = new Dictionary<string, AudioFileReader>();
         WaveOut wo = new WaveOut();
 
         public Form1()
         {
             InitializeComponent();
-
-            chart1.Series.Clear();
-            chart1.Legends.Clear();
-            chart1.Titles.Clear();
-
-            Title title1 = new Title("波形");
-
-            chart1.ChartAreas["ChartArea1"].AxisX.Title = "時間 [秒]";
-            chart1.ChartAreas["ChartArea1"].AxisY.Title = "振幅";
-            chart1.ChartAreas["ChartArea1"].BackColor = Color.Black;
-            chart1.ChartAreas["ChartArea1"].AxisX.MajorGrid.LineColor =
-                chart1.ChartAreas["ChartArea1"].AxisY.MajorGrid.LineColor =
-                    Color.DarkGreen;
-
-            var rand = new Random();
-
-            int N = 1024;
-
-            float[] sintbl = Array.ConvertAll(
-                Enumerable.Range(0, N).ToArray(),
-                i => Convert.ToSingle(Math.Sin(2.0*Math.PI*16*i/N)
-                    + Math.Sin(2.0*Math.PI*100*i/N))
-            );
-
-            Series test = new Series();
-            test.ChartType = SeriesChartType.Line;
-            test.Color = Color.Lime;
-            test.BorderWidth = 2;
-            var usSin = Resampler.resample(sintbl, sintbl.Length*16);
-            for(int i = 0; i < usSin.Length; i++)
-            {
-                test.Points.AddXY(i, usSin[i]);
-            }
-
-            chart1.Series.Add(test);
-            chart1.Titles.Add(title1);
-
-
-            chart2.Series.Clear();
-            chart2.Legends.Clear();
-            chart2.Titles.Clear();
-
-            var title2 = new Title("スペクトル");
-
-            chart2.ChartAreas["ChartArea1"].AxisX.Title = "周波数 [Hz]";
-            chart2.ChartAreas["ChartArea1"].AxisY.Title = "パワー";
-            chart2.ChartAreas["ChartArea1"].BackColor = Color.Black;
-            chart2.ChartAreas["ChartArea1"].AxisX.MajorGrid.LineColor =
-                chart2.ChartAreas["ChartArea1"].AxisY.MajorGrid.LineColor =
-                    Color.DarkGreen;
-
-            Series spectrum = new Series();
-            spectrum.ChartType = SeriesChartType.Column;
-            spectrum.Color = Color.Lime;
-            spectrum["PointWidth"] = "1.0";
-            spectrum.BorderColor = Color.Green;
-
-            var it = (new STFTIterator(sintbl, WindowFunction.hamming(N), N/2)).GetEnumerator();
-            it.MoveNext();
-            float[] power = Array.ConvertAll(it.Current, x => Convert.ToSingle(x.Norm()));
-            for (int k = 0; k < power.Length; k++) {
-                spectrum.Points.AddXY(k, power[k]);
-            }
-            spectrum.Name = "スペクトル";
-
-            Series maximul = new Series();
-            maximul.ChartType = SeriesChartType.Point;
-            var args = Maximal.argrelmax(power);
-            foreach(int i in args)
-            {
-                maximul.Points.AddXY(i, power[i]);
-            }
-            maximul.Name = "スペクトルのピーク";
-            maximul.MarkerSize = 12;
-            maximul.MarkerStyle = MarkerStyle.Cross;
-            maximul.Color = Color.Yellow;
-
-            var leg = new Legend();
-            leg.DockedToChartArea = "ChartArea1";
-            leg.Alignment = StringAlignment.Near;
-            leg.BackColor = Color.FromArgb(0xA0, 0xA0, 0xA0);
-            leg.ForeColor = Color.Cyan;
-            leg.BorderColor = Color.Gray;
-
-            chart2.Series.Clear();
-            chart2.Series.Add(spectrum);
-            chart2.Series.Add(maximul);
-            chart2.Legends.Add(leg);
-            chart2.Titles.Add(title2);
         }
-
-        
 
         private void Form1_Load(object sender, EventArgs e)
         {
 
         }
 
-        private void refAddFileButton_Click(object sender, EventArgs e)
-        {
-            var ofd = new OpenFileDialog();
-            ofd.Filter = "wavファイル(*.wav)|*.wav|すべてのファイル(*.*)|*.*";
-            ofd.Title = "wavファイルを開く";
-            ofd.Multiselect = true;
+        private void LoadSoundFile(string path) {
+            readers.Add(path, new AudioFileReader(path));
+            soundFileList.Items.Add(path);
+        }
 
-            if (ofd.ShowDialog() == DialogResult.OK)
-            {
-                foreach (string name in ofd.FileNames) {
-                    readers.Add(new AudioFileReader(name));
-                    soundFileList.Items.Add(name);
+        private void soundFileList_DragDrop(object sender, DragEventArgs e) {
+            var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            foreach (string path in files) {
+                if (String.Compare(Path.GetExtension(path), ".wav", true) == 0) {
+                    LoadSoundFile(path);
                 }
             }
         }
-
-        private void soundFileList_MouseClick(object sender, MouseEventArgs e)
-        {
-            PlaySelectedSound();
+        private void soundFileList_DragEnter(object sender, DragEventArgs e) {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop)) {
+                e.Effect = DragDropEffects.Copy;
+            }
         }
 
-        private async Task PlaySelectedSound()
-        {
-            if (wo.PlaybackState == PlaybackState.Playing) {
-                wo.Dispose();
-                wo = new WaveOut();
-            }
-            
-            wo.Init(new AudioFileReader(soundFileList.Text));
-            wo.Play();
-
-            while (wo.PlaybackState == PlaybackState.Playing) {
-                await TaskEx.Delay(1);
+        private async void ConvertButton_Click(object sender, EventArgs e) {
+            foreach (var pair in readers) {
             }
         }
     }
